@@ -17,7 +17,7 @@ void hanoi(int N, int source, int dest){
         str[i++]=source+'0';
         str[i++]=' ';
         str[i++]=dest+'0';
-        str[i++]='\n';//입출력시간 줄이기위해 문자열로 만들고 출력2
+        str[i++]='\n';//입출력시간 줄이기위해 문자열로 만들고 출력
     }
 }
 
@@ -29,5 +29,5 @@ int main(){
     cout<<(1<<N)-1<<"\n"<<str;
 }
 /*
-재귀.
+재귀
 */
