@@ -1,7 +1,7 @@
 import os
 import pytube # pip install pytube
 from moviepy.editor import * # pip install moviepy
-from openpyxl import load_workbook # pip install openpyxl 엑셀 파일 읽기 위한 라이브러리
+from openpyxl import load_workbook # pip install openpyxl 엑셀 파일 읽기 위한 라이브러리  -> csv로 대체
 import requests # pip install requests
 from bs4 import BeautifulSoup # pip install bs4
 
