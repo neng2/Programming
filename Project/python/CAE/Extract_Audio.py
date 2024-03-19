@@ -1,85 +1,67 @@
 import os
 import pytube # pip install pytube
 from moviepy.editor import * # pip install moviepy
-from openpyxl import load_workbook # pip install openpyxl 엑셀 파일 읽기 위한 라이브러리  -> csv로 대체
+import pandas as pd
 import requests # pip install requests
 from bs4 import BeautifulSoup # pip install bs4
-
-# 해당 경로에서 엑셀 파일 가져오기
-load_wb = load_workbook("C:/Users/kwons/Desktop/데이터셋_soft.xlsx", data_only=True)
-# 시트 이름으로 불러오기
-load_ws = load_wb['Sheet1']
-
-print('-----헤더를 제외한 엑셀의 모든 행과 열 저장-----')
-all_values = []
-for row in load_ws['A2':'B151']:
-    row_value = []
-    for cell in row:
-        row_value.append(cell.value)
-    all_values.append(row_value)
-#print(all_values)
-#print(all_values[0][0], all_values[0][1]) # 각각 id->new_filename에 이용, title-> query에 이용
-#print(len(all_values)) # 150
+from pydub import AudioSegment #pip install pydub
 
 
-URL = 'https://www.youtube.com/results'
-for row in range(len(all_values)): # 0~149 까지 엑셀파일의 모든 title loop
-    # HTTP request
-    params = {'search_query': all_values[row][1] } # 엑셀파일의 'title'에 해당하는 문자열로 query
-    response = requests.get(URL, params=params)
 
-    # parsing
-    html = response.text
-    soup = BeautifulSoup(html, 'html.parser')
+os.chdir("C:/Users/BONITO/Programming/Project/python/CAE/AudioDataset/") # 작업 절대 경로 세팅
+system_path = "C:/Users/BONITO/Programming/Project/python/CAE/"
+file_name = ["unbalanced_train_segments.csv","eval_segments.csv","balanced_train_segments.csv"] #system_path 및 파일 경로 세팅
 
-    # 재생 시간이 7분 미만인 동영상을 찾아서 가져온다.
-    video_index=0
-    while True:
-        running_time = soup.find_all(class_='video-time')[video_index].text # 동영상 재생시간
-        splitted_time = running_time.split(":")
+# for i in file_name:
+#     data = pd.read_csv(file_path+file_name[i])
+index=0
+dfs = []
+for name in file_name: #다른 csv파일 있을거 대비
+    df = pd.read_csv(system_path+name, sep=r',(\s)',usecols=['YTID','start_seconds','end_seconds','positive_labels'])  #구분자를 공백 포함하도록 -> '\s 가 구분자 ( \s == ' ' )  #dup data로 발생하는 컬럼 추가 방지
+    # Video labeling이 필요할 경우 'positive_labels' 컬럼 추가
+    dfs.append(df)
 
-        if len(splitted_time) == 2: # 재생시간이 분, 초
-            if int(splitted_time[0]) >= 7: # 재생시간이 7분 이상이면 다음 순서의 동영상을 가져온다.
-                video_index += 1
-                continue
-            else :
-                watch_url = soup.find_all(class_='yt-uix-sessionlink spf-link')[video_index]['href']
-                break
-        elif len(splitted_time) == 1 or len(splitted_time) == 3: # 재생시간이 초 또는 시,분,초
-            video_index += 1 # 다음 순서의 동영상을 가져온다
-            continue
 
-    # 유튜브 가져오기
-    youtube = pytube.YouTube("https://www.youtube.com" + watch_url) # 동영상 url
-    videos = youtube.streams.all()
+""" #########################################################################################################
+# data = pd.DataFrame()
+# file_list = os.listdir(system_path)
+# file_list_py = [file for file in file_list if file.endswith('csv')]
+# for name in file_list_py:
+#     file_path=system_path+name
+#     data = pd.read_csv(file_path, sep=r',(\s)')  #구분자를 공백 포함하도록 -> '\s 가 구분자 ( \s == ' ' ) 
+######################################################################################################### Scalability """ 
 
-    '''
-    # 다운받을 수 있는 스트리밍 종류
-    for i in range(len(videos)) :
-        print(i,":", videos[i])
-    '''
+URL = 'https://www.youtube.com/watch?v='
 
-    parent_dir = "C:/Users/kwons/dataset_soft" # 저장할 파일 경로
-    videos[0].download(parent_dir) # mp4로 다운로드
+speech_tag = "/m/09x0r"
+for i,ID in enumerate(dfs[0].loc[:,'YTID']):
+    #print(i)
+    if speech_tag in dfs[0]['positive_labels'][i] : # speech labeling 된 파일만
+        try:
+            # ID_list.append(URL+ID)  
+            youtube = pytube.YouTube(URL+ID) #watch_url 세팅
+            videos = youtube.streams.filter(progressive="True",file_extension="mp4").order_by('resolution') # 제일 낮은 화질로부터 음성 추출하게
+            parent_dir = "C:/Users/BONITO/Programming/Project/python/CAE/AudioDataset/" # 데이터셋 저장 경로
+            # for i in range(len(videos)) :
+            #     print(i,":", videos[i])
+            videos[0].download(parent_dir) # 경로로부터 다운로드
+            video_name = videos[0].default_filename
+            # audio_name = str(i+1)+"_"+ID+".mp3"
+            audio_name = "temp.mp3"
+            video = VideoFileClip(os.path.join(parent_dir,video_name))
+            video.audio.write_audiofile(os.path.join(parent_dir,audio_name)) # mp3 변환후 저장
+            audio = AudioSegment.from_mp3(audio_name) # mp3파일 리딩 (ffmpeg 필수)
+            start_time = int(dfs[0]['start_seconds'][i])*1000
+            end_time = int(dfs[0]['end_seconds'][i])*1000 # trim time interval 세팅
+            trimmed_audio = audio[start_time:end_time] # mp3파일 trimming
+            trimmed_audio.export(str(i+1)+"_"+ID+".mp3",format="mp3") # mp3로 추출후 저장
+            video.close()
+            if os.path.isfile(parent_dir+"/"+video_name):
+                os.remove(parent_dir+"/"+video_name)
+            if os.path.isfile(parent_dir+audio_name):
+                os.remove(parent_dir+audio_name) # 유튜브 링크로부터 추출된 mp4, mp3파일 삭제
+        except:
+            print("Video "+str(i)+" is unavailable") # Expired watch_url 핸들링
+    else : continue # speech 관련 영상 아닐 경우 skip
 
-    default_filename = videos[0].default_filename # 기존 mp4 파일이름
-
-    # id format 값 변환 후 'id_format'.mp3 파일로 저장
-    id = int(all_values[row][0]) # 엑셀파일의 id column값
-
-    if int(id / 10) == 0 :
-        id_format = "00" + str(id) # 한자리 수 id 일 경우 00x로 변환
-    elif int(id / 100) == 0 :
-        id_format = "0" + str(id) # 두자리 수 id 일 경우 0xx로 변환
-    else:
-        id_format = str(id) # 세자리 수 id 일 경우 id 값 그대로
-
-    new_filename = id_format +".mp3" # mp3로 변환할 파일 이름
-
-    video = VideoFileClip(os.path.join(parent_dir,default_filename)) # mp3로 변환할 기존 mp4파일 경로
-    video.audio.write_audiofile(os.path.join(parent_dir,new_filename)) # mp3로 변환 후 저장할 경로
-
-    video.close() # process를 끝내야 mp4파일을 지울 수 있다.
-
-    if os.path.isfile(parent_dir + "/" + default_filename):
-        os.remove(parent_dir + "/" + default_filename) # 기존 mp4 파일 지우기
+    
