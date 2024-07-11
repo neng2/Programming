@@ -34,9 +34,10 @@ for name in file_name: #다른 csv파일 있을거 대비
 URL = 'https://www.youtube.com/watch?v='
 
 speech_tag = "/m/09x0r"
-for i,ID in enumerate(dfs[0].loc[:,'YTID']):
+for i,ID in enumerate(dfs[1].loc[:,'YTID']):
+    if i<=645 : continue
     #print(i)
-    if speech_tag in dfs[0]['positive_labels'][i] : # speech labeling 된 파일만
+    if speech_tag in dfs[1]['positive_labels'][i] : # speech labeling 된 파일만
         try:
             # ID_list.append(URL+ID)  
             youtube = pytube.YouTube(URL+ID) #watch_url 세팅
@@ -51,8 +52,8 @@ for i,ID in enumerate(dfs[0].loc[:,'YTID']):
             video = VideoFileClip(os.path.join(parent_dir,video_name))
             video.audio.write_audiofile(os.path.join(parent_dir,audio_name)) # mp3 변환후 저장
             audio = AudioSegment.from_mp3(audio_name) # mp3파일 리딩 (ffmpeg 필수)
-            start_time = int(dfs[0]['start_seconds'][i])*1000
-            end_time = int(dfs[0]['end_seconds'][i])*1000 # trim time interval 세팅
+            start_time = int(dfs[1]['start_seconds'][i])*1000
+            end_time = int(dfs[1]['end_seconds'][i])*1000 # trim time interval 세팅
             trimmed_audio = audio[start_time:end_time] # mp3파일 trimming
             trimmed_audio.export(str(i+1)+"_"+ID+".mp3",format="mp3") # mp3로 추출후 저장
             video.close()
